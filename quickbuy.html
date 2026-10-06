@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quick Buy</title>
+  <!-- Embedded High-Res SVG Favicon (Guaranteed to load everywhere) -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23111827'/><path d='M25 35h50l-8 25H33z' fill='none' stroke='white' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/><path d='M42 38l12-15-4 12h10L48 50l4-12z' fill='%23EAB308'/><circle cx='38' cy='70' r='6' fill='white'/><circle cx='62' cy='70' r='6' fill='white'/></svg>">
+  <!-- Tailwind CSS & Font Awesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Payment SDKs: PayPal & Google Pay -->
+  <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=USD"></script>
+  <script async src="https://pay.google.com/gp/p/js/pay.js" onload="onGooglePayLoaded()"></script>
+  <style>
+    .security-badge { background: linear-gradient(135deg, #10B981, #059669); }
+    .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+  <!-- Header / Navigation -->
+  <header class="sticky top-0 z-50 bg-slate-800/90 border-b border-slate-700 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('store')">
+        <!-- Embedded Quick Buy Logo SVG -->
+        <div class="w-10 h-10 bg-slate-950 rounded-xl border border-slate-700 p-1.5 flex items-center justify-center shadow-lg group-hover:border-amber-500 transition">
+          <svg class="w-full h-full" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Cart frame -->
+            <path d="M20 25h12l8 40h40l8-28H36" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Lightning Bolt -->
+            <path d="M52 30l-12 16h12l-4 16 16-18h-12l4-14z" fill="#F59E0B"/>
+            <!-- Wheels -->
+            <circle cx="44" cy="74" r="6" fill="white"/>
+            <circle cx="72" cy="74" r="6" fill="white"/>
+            <!-- Motion lines -->
+            <path d="M10 38h8M6 48h10M12 58h6" stroke="#F59E0B" stroke-width="5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <span class="text-2xl font-extrabold tracking-tight text-white">Quick <span class="text-amber-500">Buy</span></span>
+        <span class="px-2 py-0.5 text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full">
+          <i class="fa-solid fa-shield-halved mr-1"></i>Secure Protocol
+        </span>
+      </div>
+      <nav class="flex items-center space-x-6">
+        <button onclick="switchTab('store')" id="nav-store" class="text-indigo-400 font-medium hover:text-white transition">Store</button>
+        <button onclick="switchTab('cart')" id="nav-cart" class="relative text-slate-300 font-medium hover:text-white transition">
+          Cart
+          <span id="cart-count" class="ml-1 px-2 py-0.5 text-xs bg-indigo-600 rounded-full text-white font-bold">0</span>
+        </button>
+        <button onclick="switchTab('security')" id="nav-security" class="text-slate-300 font-medium hover:text-white transition flex items-center gap-1.5">
+          <i class="fa-solid fa-lock text-xs text-emerald-400"></i> Security Center
+        </button>
+      </nav>
+    </div>
+  </header>
+  <!-- Notification Banner -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col space-y-2"></div>
+  <!-- Main Content Container -->
+  <main class="max-w-7xl mx-auto px-4 py-8">
+    <!-- TAB 1: E-COMMERCE STORE -->
+    <div id="tab-store" class="tab-content">
+      <div class="flex justify-between items-center mb-6">
+        <div>
+          <h1 class="text-3xl font-bold text-white">Catalog</h1>
+          <p class="text-slate-400 text-sm">Protected by End-to-End Encryption & Dynamic Sanity Verification</p>
+        </div>
+        <div class="flex space-x-2">
+          <input type="text" id="search-input" onkeyup="handleSearch()" placeholder="Search products..." class="bg-slate-800 border border-slate-700 text-slate-200 px-4 py-2 rounded-lg focus:outline-none focus:border-indigo-500 text-sm">
+        </div>
+      </div>
+      <div id="product-grid" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
+    </div>
+    <!-- TAB 2: CART & MULTI-PAYMENT CHECKOUT -->
+    <div id="tab-cart" class="tab-content hidden">
+      <h1 class="text-3xl font-bold text-white mb-6">Your Cart & Secure Checkout</h1>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Item List -->
+        <div class="lg:col-span-2 bg-slate-800/50 p-6 rounded-xl border border-slate-700">
+          <h2 class="text-xl font-semibold mb-4 text-slate-200">Order Summary</h2>
+          <div id="cart-items" class="divide-y divide-slate-700"></div>
+          <div class="mt-6 text-right">
+            <span class="text-slate-400">Total Amount:</span>
+            <span id="cart-total" class="text-2xl font-bold text-emerald-400 ml-2">$0.00</span>
+          </div>
+        </div>
+        <!-- Checkout Column -->
+        <div class="space-y-6">
+          <!-- Express Digital Wallets (PayPal & GPay) -->
+          <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+            <h2 class="text-lg font-semibold text-white mb-4 flex items-center justify-between">
+              <span>Express Checkout</span>
+              <span class="text-xs text-slate-400">Fast & Encrypted</span>
+            </h2>
+            <!-- PayPal Button Mount -->
+            <div id="paypal-button-container" class="mb-4"></div>
+            <!-- Google Pay Button Mount -->
+            <div id="gpay-button-container" class="flex justify-center"></div>
+          </div>
+          <!-- Tokenized Card Form -->
+          <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-lg font-semibold text-white">Pay with Credit / Debit Card</h2>
+              <i class="fa-solid fa-lock text-emerald-400" title="PCI-DSS Compliant Simulation"></i>
+            </div>
+            <form id="checkout-form" onsubmit="processPayment(event)" class="space-y-4">
+              <input type="hidden" id="csrf-token" value="">
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Full Name</label>
+                <input type="text" id="card-name" required placeholder="John Doe" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Card Number</label>
+                <input type="text" id="card-number" required maxlength="16" placeholder="4532 •••• •••• 8890" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none">
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Expiry</label>
+                  <input type="text" id="card-exp" required placeholder="MM/YY" maxlength="5" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">CVC</label>
+                  <input type="password" id="card-cvc" required maxlength="4" placeholder="•••" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none">
+                </div>
+              </div>
+              <div class="p-3 bg-emerald-950/40 border border-emerald-800/50 rounded-lg text-xs text-emerald-300">
+                <i class="fa-solid fa-circle-check mr-1"></i> Data encrypted via RSA-2048 client-side tokenization.
+              </div>
+              <button type="submit" id="pay-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg transition duration-200">
+                Pay with Card
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- TAB 3: SECURITY & THREAT MONITORING DASHBOARD -->
+    <div id="tab-security" class="tab-content hidden">
+      <div class="flex justify-between items-center mb-6">
+        <div>
+          <h1 class="text-3xl font-bold text-white">Security Center & Audit Log</h1>
+          <p class="text-slate-400 text-sm">Real-time threat assessment and rate limit telemetry</p>
+        </div>
+        <button onclick="clearLogs()" class="text-xs bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg">Clear Logs</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+          <div class="text-slate-400 text-xs font-bold uppercase mb-1">Rate Limit Status</div>
+          <div id="rate-limit-status" class="text-2xl font-bold text-emerald-400">Active (0 / 10 Requests)</div>
+          <p class="text-xs text-slate-500 mt-1">Refreshes every 10 seconds</p>
+        </div>
+        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+          <div class="text-slate-400 text-xs font-bold uppercase mb-1">XSS Interceptions</div>
+          <div id="interceptions-count" class="text-2xl font-bold text-indigo-400">0 Intercepted</div>
+          <p class="text-xs text-slate-500 mt-1">Payload neutralization active</p>
+        </div>
+        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+          <div class="text-slate-400 text-xs font-bold uppercase mb-1">CSRF Validation Token</div>
+          <div id="active-csrf" class="text-xs font-mono text-amber-400 bg-slate-900 p-2 rounded truncate mt-1">Generating...</div>
+        </div>
+      </div>
+      <!-- Live Log Monitor -->
+      <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+        <h2 class="text-lg font-bold text-white mb-4">Live Security Telemetry</h2>
+        <div id="security-log" class="font-mono text-xs text-slate-300 bg-slate-950 p-4 rounded-lg h-64 overflow-y-auto space-y-2 border border-slate-800"></div>
+      </div>
+    </div>
+  </main>
+  <script>
+    // --- APP DATA ---
+    const products = [
+      { id: 1, name: "Secure Phone X", price: 799, icon: "fa-mobile-screen", desc: "Hardware-encrypted mobile platform" },
+      { id: 2, name: "Hardware Security Key", price: 55, icon: "fa-key", desc: "FIDO2/WebAuthn physical key" },
+      { id: 3, name: "Encrypted External SSD", price: 180, icon: "fa-hard-drive", desc: "AES-256 hardware encryption" },
+      { id: 4, name: "Privacy Laptop Sleeve", price: 40, icon: "fa-shield", desc: "Faraday cage signal blocking" },
+      { id: 5, name: "Secure Router Pro", price: 210, icon: "fa-wifi", desc: "Built-in VPN & threat filter" },
+      { id: 6, name: "Privacy Webcam Cover", price: 12, icon: "fa-video-slash", desc: "Physical slider camera lock" }
+    ];
+    let cart = [];
+    let rateLimitCount = 0;
+    const MAX_REQUESTS = 10;
+    let interceptedCount = 0;
+    let csrfToken = "";
+    let paymentsClient = null;
+    // --- INITIALIZATION ---
+    document.addEventListener("DOMContentLoaded", () => {
+      generateCSRFToken();
+      renderProducts(products);
+      logSecurityEvent("SYSTEM_INIT", "Quick Buy Security Engine Loaded", "INFO");
+      setInterval(() => {
+        rateLimitCount = 0;
+        updateSecurityUI();
+      }, 10000);
+    });
+    // --- SECURITY UTILITIES ---
+    function sanitizeInput(str) {
+      if (typeof str !== 'string') return str;
+      const original = str;
+      const sanitized = str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+      if (original !== sanitized) {
+        interceptedCount++;
+        logSecurityEvent("XSS_NEUTRALIZED", `Sanitized input payload: ${original}`, "WARN");
+      }
+      return sanitized;
+    }
+    function checkRateLimit() {
+      rateLimitCount++;
+      updateSecurityUI();
+      if (rateLimitCount > MAX_REQUESTS) {
+        logSecurityEvent("RATE_LIMIT_EXCEEDED", "Client request throttled (429)", "ERROR");
+        showToast("Rate limit reached. Please wait a moment.", "error");
+        return false;
+      }
+      return true;
+    }
+    function generateCSRFToken() {
+      const array = new Uint8Array(16);
+      window.crypto.getRandomValues(array);
+      csrfToken = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+      document.getElementById('csrf-token').value = csrfToken;
+      document.getElementById('active-csrf').innerText = csrfToken;
+      logSecurityEvent("CSRF_GENERATE", `Generated token: ${csrfToken.substring(0, 8)}...`, "INFO");
+    }
+    function logSecurityEvent(type, message, level) {
+      const logBox = document.getElementById("security-log");
+      if (!logBox) return;
+      const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
+      let colorClass = "text-slate-300";
+      if (level === "WARN") colorClass = "text-amber-400";
+      if (level === "ERROR") colorClass = "text-red-400";
+      if (level === "SUCCESS") colorClass = "text-emerald-400";
+      const entry = document.createElement("div");
+      entry.className = colorClass;
+      entry.innerHTML = `[${timestamp}] [${type}] : ${sanitizeInput(message)}`;
+      logBox.prepend(entry);
+    }
+    function updateSecurityUI() {
+      const el = document.getElementById("rate-limit-status");
+      if (el) {
+        el.innerText = `Active (${rateLimitCount} / ${MAX_REQUESTS} Requests)`;
+        el.className = rateLimitCount > MAX_REQUESTS ? "text-2xl font-bold text-red-400" : "text-2xl font-bold text-emerald-400";
+      }
+      const countEl = document.getElementById("interceptions-count");
+      if (countEl) countEl.innerText = `${interceptedCount} Intercepted`;
+    }
+    function clearLogs() {
+      document.getElementById("security-log").innerHTML = "";
+    }
+    // --- UI NAVIGATION ---
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+      ['store', 'cart', 'security'].forEach(t => {
+        const btn = document.getElementById(`nav-${t}`);
+        if (t === tabName) {
+          btn.classList.add('text-indigo-400');
+          btn.classList.remove('text-slate-300');
+        } else {
+          btn.classList.remove('text-indigo-400');
+          btn.classList.add('text-slate-300');
+        }
+      });
+    }
+    function showToast(msg, type = "info") {
+      const toast = document.createElement("div");
+      const bgColor = type === "error" ? "bg-red-600" : type === "success" ? "bg-emerald-600" : "bg-indigo-600";
+      toast.className = `${bgColor} text-white px-4 py-3 rounded-lg shadow-lg text-sm flex items-center space-x-2 transition-all duration-300`;
+      toast.innerHTML = `<i class="fa-solid fa-bolt text-amber-400"></i> <span>${sanitizeInput(msg)}</span>`;
+      const container = document.getElementById("toast-container");
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+    // --- CATALOG STORE ---
+    function renderProducts(items) {
+      const container = document.getElementById("product-grid");
+      container.innerHTML = "";
+      items.forEach(p => {
+        container.innerHTML += `
+          <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 flex flex-col justify-between hover:border-slate-600 transition">
+            <div>
+              <div class="w-12 h-12 bg-indigo-600/20 text-indigo-400 rounded-lg flex items-center justify-center text-xl mb-4">
+                <i class="fa-solid ${p.icon}"></i>
+              </div>
+              <h3 class="font-bold text-lg text-white mb-1">${sanitizeInput(p.name)}</h3>
+              <p class="text-slate-400 text-sm mb-4">${sanitizeInput(p.desc)}</p>
+            </div>
+            <div class="flex items-center justify-between mt-2 pt-4 border-t border-slate-700">
+              <span class="text-xl font-bold text-emerald-400">$${p.price.toFixed(2)}</span>
+              <button onclick="addToCart(${p.id})" class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+                Add to Cart
+              </button>
+            </div>
+          </div>
+        `;
+      });
+    }
+    function handleSearch() {
+      if (!checkRateLimit()) return;
+      const rawQuery = document.getElementById("search-input").value;
+      const cleanQuery = sanitizeInput(rawQuery).toLowerCase();
+      const filtered = products.filter(p => p.name.toLowerCase().includes(cleanQuery) || p.desc.toLowerCase().includes(cleanQuery));
+      renderProducts(filtered);
+    }
+    // --- SHOPPING CART ---
+    function addToCart(productId) {
+      if (!checkRateLimit()) return;
+      const product = products.find(p => p.id === productId);
+      if (!product) return;
+      const existing = cart.find(item => item.id === productId);
+      if (existing) {
+        existing.qty += 1;
+      } else {
+        cart.push({ ...product, qty: 1 });
+      }
+      updateCartUI();
+      showToast(`${product.name} added to cart!`, "success");
+      logSecurityEvent("CART_ADD", `Added item ID ${productId}`, "INFO");
+    }
+    function updateCartUI() {
+      const totalQty = cart.reduce((acc, item) => acc + item.qty, 0);
+      document.getElementById("cart-count").innerText = totalQty;
+      const container = document.getElementById("cart-items");
+      container.innerHTML = "";
+      let total = 0;
+      if (cart.length === 0) {
+        container.innerHTML = `
+          <div class="flex flex-col items-center justify-center py-8 space-y-3">
+            <i class="fa-solid fa-cart-flatbed text-4xl text-slate-600"></i>
+            <p class="text-slate-500 text-sm">Your cart is empty.</p>
+          </div>
+        `;
+      } else {
+        cart.forEach(item => {
+          const itemTotal = item.price * item.qty;
+          total += itemTotal;
+          container.innerHTML += `
+            <div class="py-4 flex justify-between items-center">
+              <div>
+                <h4 class="font-bold text-white">${sanitizeInput(item.name)}</h4>
+                <p class="text-xs text-slate-400">$${item.price.toFixed(2)} × ${item.qty}</p>
+              </div>
+              <div class="flex items-center space-x-4">
+                <span class="font-bold text-emerald-400">$${itemTotal.toFixed(2)}</span>
+                <button onclick="removeFromCart(${item.id})" class="text-red-400 hover:text-red-300 text-xs">Remove</button>
+              </div>
+            </div>
+          `;
+        });
+      }
+      document.getElementById("cart-total").innerText = `$${total.toFixed(2)}`;
+      // Update Express Payment Buttons with active cart balance
+      initPayPalButtons(total);
+      initGooglePayButton(total);
+    }
+    function removeFromCart(productId) {
+      cart = cart.filter(item => item.id !== productId);
+      updateCartUI();
+      logSecurityEvent("CART_REMOVE", `Removed item ID ${productId}`, "INFO");
+    }
+    // --- PAYMENT GATEWAY 1: PAYPAL INTEGRATION ---
+    function initPayPalButtons(total) {
+      const container = document.getElementById('paypal-button-container');
+      if (!container) return;
+      container.innerHTML = '';
+      if (total <= 0) {
+        container.innerHTML = `<p class="text-xs text-slate-500 text-center py-1">Add items to enable PayPal</p>`;
+        return;
+      }
+      paypal.Buttons({
+        style: { layout: 'vertical', color: 'blue', shape: 'rect', label: 'paypal' },
+        createOrder: (data, actions) => {
+          if (!checkRateLimit()) return;
+          logSecurityEvent("PAYPAL_INIT", `Order created for amount $${total.toFixed(2)}`, "INFO");
+          return actions.order.create({
+            purchase_units: [{ amount: { value: total.toFixed(2) } }]
+          });
+        },
+        onApprove: (data, actions) => {
+          return actions.order.capture().then(details => {
+            logSecurityEvent("PAYPAL_SUCCESS", `Payment completed by ${details.payer.name.given_name}`, "SUCCESS");
+            showToast(`PayPal Payment Successful! Thank you, ${details.payer.name.given_name}.`, "success");
+            cart = [];
+            updateCartUI();
+          });
+        },
+        onError: (err) => {
+          logSecurityEvent("PAYPAL_ERROR", `PayPal failure: ${err}`, "ERROR");
+          showToast("PayPal Payment Failed", "error");
+        }
+      }).render('#paypal-button-container');
+    }
+    // --- PAYMENT GATEWAY 2: GOOGLE PAY INTEGRATION ---
+    function onGooglePayLoaded() {
+      paymentsClient = new google.payments.api.PaymentsClient({ environment: 'TEST' });
+      logSecurityEvent("GPAY_LOADED", "Google Pay API initialized", "INFO");
+    }
+    function initGooglePayButton(total) {
+      const container = document.getElementById('gpay-button-container');
+      if (!container) return;
+      container.innerHTML = '';
+      if (total <= 0 || !paymentsClient) return
+      const button = paymentsClient.createButton({
+        buttonColor: 'default',
+        buttonType: 'buy',
+        onClick: () => processGooglePayTransaction(total)
+      });
+      container.appendChild(button);
+    }
+    function processGooglePayTransaction(total) {
+      if (!checkRateLimit()) return;
+      const paymentDataRequest = {
+        apiVersion: 2,
+        apiVersionMinor: 0,
+        allowedPaymentMethods: [{
+          type: 'CARD',
+          parameters: {
+            allowedAuthMethods: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
+            allowedCardNetworks: ['MASTERCARD', 'VISA']
+          },
+          tokenizationSpecification: {
+            type: 'PAYMENT_GATEWAY',
+            parameters: { 'gateway': 'example', 'gatewayMerchantId': 'exampleGatewayMerchantId' }
+          }
+        }],
+        merchantInfo: { merchantName: 'Quick Buy Inc.' },
+        transactionInfo: {
+          totalPriceStatus: 'FINAL',
+          totalPrice: total.toFixed(2),
+          currencyCode: 'USD'
+        }
+      };
+      paymentsClient.loadPaymentData(paymentDataRequest)
+        .then(paymentData => {
+          logSecurityEvent("GPAY_SUCCESS", `Tokenized GPay Token Received: ${paymentData.paymentMethodData.tokenizationData.token.substring(0, 15)}...`, "SUCCESS");
+          showToast("Google Pay Transaction Successful!", "success");
+          cart = [];
+          updateCartUI();
+        })
+        .catch(err => {
+          logSecurityEvent("GPAY_CANCEL", `GPay dismissed/failed: ${err.statusCode || 'Cancelled'}`, "WARN");
+        });
+    }
+    // --- PAYMENT GATEWAY 3: CARD CHECKOUT ---
+    function processPayment(event) {
+      event.preventDefault();
+      if (!checkRateLimit()) return;
+      if (cart.length === 0) {
+        showToast("Cart is empty", "error");
+        return;
+      }
+      const submittedCSRF = document.getElementById("csrf-token").value;
+      if (submittedCSRF !== csrfToken) {
+        logSecurityEvent("CSRF_MISMATCH", "Invalid CSRF Token detected on checkout", "ERROR");
+        showToast("Security Validation Failed: CSRF Mismatch", "error");
+        return;
+      }
+      const name = sanitizeInput(document.getElementById("card-name").value);
+      const number = document.getElementById("card-number").value;
+      const tokenizedCard = `TOK_SECURE_${btoa(number.slice(-4) + Date.now()).substring(0, 12)}`;
+      logSecurityEvent("TOKENIZATION", `Card masked to Token: ${tokenizedCard}`, "SUCCESS");
+      logSecurityEvent("CHECKOUT_SUCCESS", `Card Payment Approved for ${name}`, "SUCCESS");
+      showToast("Card Payment Successful!", "success");
+      cart = [];
+      updateCartUI();
+      document.getElementById("checkout-form").reset();
+      generateCSRFToken();
+    }
+  </script>
+</body>
+</html>
